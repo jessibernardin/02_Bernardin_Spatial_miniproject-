@@ -1,0 +1,204 @@
+---
+title: "02_Bernardin_Mini_Project"
+author: "Jessica Bernardin"
+date: "11/18/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+```{r packages}
+library(tidycensus)
+library(tidyverse)
+library(pander)
+library(sf)
+library(terra)
+library(units)
+library(purrr)
+library(sp)
+library(profvis)
+library(ggmap)
+library(cartogram)
+library(patchwork)
+library(tmap)
+library(viridis)
+library(tigris)
+library(gridExtra)
+library(plotly)
+webshot::install_phantomjs()
+```
+
+```{r loadscript, include=FALSE, cache = TRUE}
+#set working directory
+setwd("~/Desktop/R_spatial_Fall 2021/miniproject/02_Bernardin_Spatial_miniproject-")
+
+#source objects from miniproject script
+source("01_miniproject_script.R", local = knitr::knit_global())
+```
+
+
+## Goals for the Assignment
+1.  Develop two static maps that display the relationship between your response and predictor variable:
+  - number of pitcher plant observations on iNaturalist
+  - percent cropland (cropland/total land)
+
+2.  Develop one interactive map that allows you to explore correlations between your predictor variables:
+  - relationship between pitcher plant count by state, july temperature, percent crop land, and elevation
+
+3.  Develop two non-spatial visualizations that characterize the same correlations without a map
+ - ggplot scatter plot showing temperature (x) and pitcher plant point (y)
+ - ggplot scatter plot showing elevation (x) and pitcher plant point (y)
+ - ggplot scatter plot showing cropland percent (x) and pitcher plant point (y)
+  
+  
+4.  Rmarkdown with:
+  - research question
+  - what you hope to learn from the visualizations
+  - reflections on the effectiveness of each visualization
+  - does mapping help or confuse relationships? 
+  - how do interactive maps facilitate different kinds of explorations compared with static maps? 
+  - how you might approach planning an analysis and presenting the results? 
+  
+  
+## Data I have:
+  1. state.df (this is a lot of tab data)
+  - state boundaries
+  - elevation by state
+  - population by state
+  - land use by state
+  
+  2. state.df.sf (this has the spatial data of each state)
+  
+  3. watershed
+  - sf with the watershed boundaries
+  - pt_count from pitcher plant data
+  - watershed.f filters out the watersheds with 0 pitcher plants
+  
+  4. pitcher.sf
+  - temp extracted from raster for each point
+  - precip extracted from raster for each point
+  
+  5. rasters
+  - temp.rast
+  - precip.rast
+  
+```{r staticmaps}
+
+###temperature vs pitcher plant abundance by states
+
+#take out places really far away
+state.df.sf1 <- state.df.sf[!state.df.sf$STUSPS == "HI",]
+state.df.sf1 <- state.df.sf[!state.df.sf$STUSPS == "PR",]
+
+
+#number of pitchers in each state
+state.df.sf1$pt_count <- lengths(st_intersects(state.df.sf1, pitcher.sf))
+
+state.df.sf.f <- state.df.sf1 %>%
+  filter_at(vars(starts_with("pt_count")), any_vars(. > 0))
+
+#plot of ranges of point counts in each state
+
+p1 <- tm_shape(st_as_sf(state.df.sf.f)) + tm_polygons(col = "pt_count",  border.col = "white") + 
+  tm_legend(outside = TRUE) + tm_compass() +
+    tm_scale_bar() +tm_layout(main.title = "iNaturalist Purple Pitcher Plants", main.title.position = "center")
+
+## working with predictor variables
+
+class(state.df.sf.f$"Total.land")
+class(state.df.sf.f$"Total.cropland")
+
+state.df.sf.f$Total.cropland <- as.integer((state.df.sf.f$Total.cropland))
+class(state.df.sf.f$"Total.cropland")
+
+state.df.sf.f <- mutate(state.df.sf.f, per_crop = Total.cropland/Total.land)
+
+p2 <- tm_shape(st_as_sf(state.df.sf.f)) + tm_polygons(col = "per_crop",  border.col = "white") + tm_legend(outside = TRUE) + tm_compass() +
+    tm_scale_bar() +tm_layout(main.title = "Proportion Cropland", main.title.position = "center")
+
+tmap_arrange(p1, p2, nrow = 1)
+```
+
+  
+```{r interactivemap}
+temp <- state.df.sf.f$temp
+
+plot_ly(state.df.sf.f) %>% 
+  add_sf(
+    color = ~pt_count, 
+    split = ~NAME, 
+    span = I(1),
+    text = ~paste(NAME, per_crop, temp, mean_elevation),
+    hoverinfo = "text",
+    hoveron = "fills"
+  ) %>%
+  layout(showlegend = FALSE) %>%
+  colorbar(title = "Pitcher Plant \n Count")
+
+
+```
+
+  
+```{r notamap}
+
+##ggplot plotting crop land percent and pitcher plant count per state 
+ggplot(state.df.sf.f, aes(x = per_crop, y=pt_count)) + geom_point() + 
+  labs(x="Proportion Cropland", y="iNat S. purpurea observations") + geom_smooth(method = "lm")
+
+
+##ggplot plotting annual mean temperature per state vs pitcher plant count
+temp.extract.st <- terra::extract(temp.rast, state.df.sf.f, fun = mean, na.rm=TRUE)
+state.df.sf.f$temp <- temp.extract.st
+ggplot(state.df.sf.f, aes(x = temp, y=pt_count)) + geom_point() +
+labs(x="Annual Mean Temperature (C*10)", y="iNat S. purpurea observations") + geom_smooth(method = "lm")
+
+##ggplot plotting elevation and pitcher plant count per state 
+ggplot(state.df.sf.f, aes(x = mean_elevation, y=pt_count)) + geom_point() +
+labs(x="Mean Elevation (m)", y="iNat S. purpurea observations") + geom_smooth(method = "lm")
+
+hist(state.df.sf.f$mean_elevation)
+
+```
+  
+
+## Mini Project #2 Reflection
+
+  - Are pitcher plant counts influenced by variables like elevation, mean annual temperature, or percent cropland cover?
+  - My goal was to use the visualizations to clearly illustrate the relationship between several environmental/land use variables and pitcher plant observations.  
+  - Because the 'S. purpurea' is widespread across the world and even the US, visualizing the effect of elevation and temperature showed little pattern when looking at the map.  The maps helped to infer that distribution is likely related to coastal wetlands over other environmental variables like temperature.  
+  - I think that mapping helped to visualize patterns (related to proximity to the coast) but was not very helpful for understanding the relationship between observation number and temp/cropland/elevation.
+  - I think that interactive maps are nice because it gets the viewer to participate with the visualization, however if the data presented on hovering isn't well explained, it might lead to more confusion than intended.
+  - I think the maps are a good way to look for spatial patterns, and this can inform which analysis you choose or could lead to you abandoning some initial data and looking for other variables that might play a role.  In my case, it might be interesting to look at distance from coast or soil moisture as additional variables for being able to predict locations of 'S. purpurea' populations. 
+  
+  
+  
+  
+```{r extrastuff}
+
+
+
+#st.sp <- as(state.df.sf, 'Spatial')
+
+#temp.crop <- raster::crop(temp.rast, st.sp)
+#plot(temp.crop, axes = FALSE)
+#plot(temp.crop, add = TRUE, box = FALSE, axes = FALSE)
+
+
+#st_crs(state.df.sf) == st_crs(temp.rast)
+
+#plot(st_geometry(state.df.sf))
+#plot(temp.rast)
+#e <- extent(c(-179.1743, -50, 20, 71.41377))
+#t.c <- crop (temp.rast, e)
+#plot(t.c)
+
+
+#tm_shape(temp.crop) +
+ # tm_raster("Temp", palette = viridis(n=50), n=50, legend.show=FALSE, #legend.hist = TRUE, #legend.hist.title = "Mean Annual Temperature")
+
+```
+  
+  
