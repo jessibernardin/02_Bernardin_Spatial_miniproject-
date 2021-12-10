@@ -13,7 +13,7 @@ library(tidyverse)
 library(Rcpp)
 library(terra)
 library(dplyr)
-setwd("~/Desktop/R_spatial_Fall 2021/miniproject/01_Bernardin_Spatial_miniproject")
+setwd("/home/matt/class-fall-2021/homework-grading/mp1/01_Bernardin_Spatial_miniproject/")
 
 #dependent variable, location of iNat purple pitcher plant observations from GBIF
 pitcher <- read.csv("gbif_sarracenia.csv", sep = "\t")
@@ -63,6 +63,7 @@ state.elevation <- elevation %>% dplyr::group_by(STATE_ALPHA) %>%
 names(state.elevation)[1] <- "Code"
 
 st.elev.pop <- left_join(population, state.elevation, by = "Code")
+colnames(st.elev.pop)[1] <- "state"
 
 st.elev.pop <- distinct(st.elev.pop, state, .keep_all = TRUE)
 

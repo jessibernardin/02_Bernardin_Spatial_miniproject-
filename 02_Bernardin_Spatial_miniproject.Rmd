@@ -33,7 +33,7 @@ webshot::install_phantomjs()
 
 ```{r loadscript, include=FALSE, cache = TRUE}
 #set working directory
-setwd("~/Desktop/R_spatial_Fall 2021/miniproject/02_Bernardin_Spatial_miniproject-")
+setwd()
 
 #source objects from miniproject script
 source("01_miniproject_script.R", local = knitr::knit_global())
@@ -121,7 +121,7 @@ p2 <- tm_shape(st_as_sf(state.df.sf.f)) + tm_polygons(col = "per_crop",  border.
 
 tmap_arrange(p1, p2, nrow = 1)
 ```
-
+_thinking about these upper-midwestern states makes me wonder whether you don't want a finer scale (like county) summary. When I think about pitcher plants in MN, many (most?) are in the northern part of the state (tamarack bog country) whereas the bulk of crop production is in the south ane western portion of the state. Just a thought)_
   
 ```{r interactivemap}
 temp <- state.df.sf.f$temp
@@ -141,6 +141,7 @@ plot_ly(state.df.sf.f) %>%
 
 ```
 
+  _would be nice if the values were labeled and had units; it also seems like you could make the fill one of your potential predictors and then base the alpha on the number of pitcher plants_
   
 ```{r notamap}
 
